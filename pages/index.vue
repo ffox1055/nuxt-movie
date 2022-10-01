@@ -3,9 +3,44 @@
     <!-- hero -->
     <HeroSect />
 
+    <!-- search -->
+    <div class="container search">
+      <input v-model.lazy="searchInput" type="text" placeholder="Search"  @keyup.enter="$fetch" />
+      <button v-show="searchInput !== ''" class="button" @click="clearSearch" >Clear Search</button>
+    </div>
+
+    <!-- loading -->
+    <LoadingComp v-if="$fetchState.pending"/>
     <!-- movie -->
-    <div class="container movies">
-      <div id="moive-grid" class="movies-grid">
+    <div v-else class="container movies">
+      <div v-if="searchInput !== ''" id="moive-grid" class="movies-grid">
+        <div v-for="(movie, index) in searchedMovies" :key="index" class="movie" >
+          <div class="movie-img">
+            <img :src="`https://image.tmdb.org/t/p/w500/${movie.poster_path}`" alt="">
+            <p class="review"> {{movie.vote_average}} </p>
+            <p class="overview"> {{movie.overview}} </p>
+          </div>
+          <div class="info">
+            <p class="title">{{movie.title.slice(0, 25)}} 
+              <span v-if="movie.title.length > 25">...</span>
+            </p>
+            <p class="release">
+              Released:
+              {{
+                new Date(movie.release_date).toLocaleString('en-us', {
+                  month: 'long',
+                  day: 'numeric',
+                  year: 'numeric',
+                })
+              }}
+            </p>
+            <NuxtLink :to="{ name: 'movies-movieid', params: {movieid: movie.id} }" class="button button-light">
+              Get More Info
+            </NuxtLink>
+          </div>
+        </div>
+      </div>
+      <div v-else id="moive-grid" class="movies-grid">
         <div v-for="(movie, index) in movies" :key="index" class="movie" >
           <div class="movie-img">
             <img :src="`https://image.tmdb.org/t/p/w500/${movie.poster_path}`" alt="">
@@ -40,27 +75,93 @@
 import axios from 'axios'
 export default {
   name: 'IndexPage',
+  head() {
+    return {
+      title: 'Movie App - Latest Streaming Movie Info',
+      meta: [
+        {
+          hid: 'description',
+          name: 'description', 
+          content: 'Get all the latest streaming movies in theaters & online',
+        },
+        {
+          hid: 'keywords',
+          name: 'keywords', 
+          content: 'movies, stream, streaming',
+        }
+      ]
+    }
+  },
   data() {
     return {
       movies: [],
+      searchedMovies: [],
+      searchInput: ''
     }
   }, 
   async fetch() {
-    await this.getMovies()
+    if(this.searchInput === '') {
+      await this.getMovies()
+      return
+    }
+    await this.searchMovies()
   },
+  fetchDelay: 1000, 
   methods: {
     async getMovies() {
       const data = axios.get('https://api.themoviedb.org/3/movie/now_playing?api_key=95044e05afdc1d8700aed108a4247952&language=en-US&page=1')
       const result = await data
+
       result.data.results.forEach((movie) => {
         this.movies.push(movie)
       })
+    }, 
+    async searchMovies() {
+      const data = axios.get(
+        `https://api.themoviedb.org/3/search/movie?api_key=95044e05afdc1d8700aed108a4247952&language=en-US&query=${this.searchInput}&page=1&include_adult=false`
+      )
+      const result = await data
+
+      result.data.results.forEach((movie) => {
+        this.searchedMovies.push(movie)
+      })
+    },
+    clearSearch() {
+      this.searchInput = '';
+      this.searchedMovies = [];
     }
   }
 }
 </script>
 
 <style lang="scss" scoped>
+.loading {
+  padding-top: 120px;
+  align-items: flex-start;
+}
+
+.search {
+  display: flex;
+  padding: 32px 16px;
+  input {
+    max-width: 350px;
+    width: 100%;
+    padding: 12px 6px;
+    font-size: 14px;
+    border: none;
+    border-bottom: 3px solid transparent;
+    transition: all .3s;
+    &:focus {
+      outline: none;
+      border-bottom: 3px solid #c92502;
+    }
+  }
+  .button {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+}
+
 .movies {
   padding: 32px 16px;
   .movies-grid {
@@ -72,7 +173,7 @@ export default {
       grid-template-columns: repeat(2, 1fr);
     }
     @media (min-width: 750px) {
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(3, 1fr);
     }
     @media (min-width: 1100px) {
       grid-template-columns: repeat(4, 1fr);
